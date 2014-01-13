@@ -1,8 +1,8 @@
 CC=gcc
 CFLAGS=-I.
 DEPS =
-OBJ = uniqidserver.o
-EXE = uniqidserver
+OBJ = uniqueidserver.o
+EXE = uniqueidserver
 
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
