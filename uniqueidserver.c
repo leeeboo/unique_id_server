@@ -47,8 +47,6 @@ typedef struct {
 
 
 /* True global resources - no need for thread safety here */
-static int worker_id;
-static int datacenter_id;
 static ukey_uint64 twepoch;
 static ukey_context_t *context;
 
@@ -128,9 +126,7 @@ static void skeleton_daemon()
 int main(int argc, char ** argv)
 {
 
-    skeleton_daemon();
-
-    int listenfd, connfd, port, machine_id;
+    int listenfd, connfd, port, machine_id, datacenter_id;
     struct sockaddr_in servaddr, cliaddr;
     struct timeval tv;
     socklen_t clilen;
@@ -139,25 +135,35 @@ int main(int argc, char ** argv)
     ukey_uint64 timestamp;
     ukey_uint64 retval;
 
-    if (argc != 2 && argc != 3) {
-        printf("Usage: uniqidserver <port> <machineid>\n");
+    if (argc != 4) {
+        printf("Usage: uniqidserver <port> <datacenterid> <machineid>\n");
         return 1;
     }
 
     port = atoi(argv[1]);
-    machine_id = (argc == 2 ? -1 : atoi(argv[2]));
 
-    if (machine_id < 0 || machine_id > 255) {
-        fprintf(stderr, "WARN: Not using a machine ID\n");
-        machine_id = -1;
+    datacenter_id = atoi(argv[2]);
+
+    if (datacenter_id < 0 || datacenter_id > 31) {
+        fprintf(stderr, "WARN: Not using a datacenter ID\n");
+        datacenter_id = 1;
     }
 
-    if (ukey_startup(1288834974657LL, machine_id, 1) == -1) {
+    machine_id = atoi(argv[3]);
+
+    if (machine_id < 0 || machine_id > 31) {
+        fprintf(stderr, "WARN: Not using a machine ID\n");
+        machine_id = 1;
+    }
+
+    if (ukey_startup(1288834974657LL, machine_id, datacenter_id) == -1) {
         printf("startup error!\n");
         return 1;
     }
 
     char str[18];
+
+    skeleton_daemon();
 
     while (1) {
 
@@ -177,34 +183,29 @@ int main(int argc, char ** argv)
                 if (gettimeofday(&tv, NULL) == -1) {
                     sendto(connfd, "ERR", 3, 0, (struct sockaddr *)&cliaddr, clilen);
                 } else {
-                    if (machine_id == -1) {
-                        // No machine ID.
-                        snprintf(id_buf, 14, "%08x%03x", (unsigned int)tv.tv_sec, tv.tv_usec);
-                    } else {
-                        // With machine ID.
-                        timestamp = really_time();
+                    // With machine ID.
+                    timestamp = really_time();
 
-                        if (context->last_timestamp == timestamp) {
-                            context->sequence = (context->sequence + 1) & context->sequence_mask;
+                    if (context->last_timestamp == timestamp) {
+                        context->sequence = (context->sequence + 1) & context->sequence_mask;
 
-                            if (context->sequence == 0) {
-                                timestamp = skip_next_millis();
-                            }
-
-                        } else {
-                            context->sequence = 0; /* Back to zero */
+                        if (context->sequence == 0) {
+                            timestamp = skip_next_millis();
                         }
 
-                        context->last_timestamp = timestamp;
-
-                        retval = ((timestamp - context->twepoch) << context->timestamp_left_shift) |
-                            (context->datacenter_id << context->datacenter_id_shift) |
-                            (context->worker_id << context->worker_id_shift) |
-                            context->sequence;
-
-                        sprintf(str, "%lld", retval);
-
+                    } else {
+                        context->sequence = 0; /* Back to zero */
                     }
+
+                    context->last_timestamp = timestamp;
+
+                    retval = ((timestamp - context->twepoch) << context->timestamp_left_shift) |
+                        (context->datacenter_id << context->datacenter_id_shift) |
+                        (context->worker_id << context->worker_id_shift) |
+                        context->sequence;
+
+                    sprintf(str, "%lld", retval);
+
                     sendto(connfd, str, 18, 0, (struct sockaddr *)&cliaddr, clilen);
                 }
                 close(connfd);
