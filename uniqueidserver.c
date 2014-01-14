@@ -126,8 +126,6 @@ static void skeleton_daemon()
 int main(int argc, char ** argv)
 {
 
-    skeleton_daemon();
-
     int listenfd, connfd, port, machine_id, datacenter_id;
     struct sockaddr_in servaddr, cliaddr;
     struct timeval tv;
@@ -158,12 +156,17 @@ int main(int argc, char ** argv)
         machine_id = 1;
     }
 
-    if (ukey_startup(1288834974657LL, machine_id, 1) == -1) {
+    if (ukey_startup(1288834974657LL, machine_id, datacenter_id) == -1) {
         printf("startup error!\n");
         return 1;
     }
 
     char str[18];
+
+    printf("%d\n", datacenter_id);
+    printf("%d\n", machine_id);
+
+    skeleton_daemon();
 
     while (1) {
 
