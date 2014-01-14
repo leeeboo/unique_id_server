@@ -23,6 +23,7 @@ PHP Client Example:
         $hear = trim($hear);
 
         if (!empty($hear) && $hear != 'ERR') {
+            $id = $hear;
             echo $id;
         } else {
             echo 'Server Error';
